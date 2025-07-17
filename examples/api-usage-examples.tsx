@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  sendReward,
+  sendAssetReward,
   getUserInfo,
   updateUserInfo,
   deleteUser,
@@ -52,7 +52,7 @@ const RewardDistributionExample = () => {
         <CardDescription>使用专门的 useSendRewardMutation 和 useSendRewardQuery</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Button onClick={() => sendRewardMutation.mutate([params])} disabled={sendRewardMutation.isPending}>
+        <Button onClick={() => sendRewardMutation.mutate(params)} disabled={sendRewardMutation.isPending}>
           {sendRewardMutation.isPending ? 'Sending...' : 'Send Reward (Mutation)'}
         </Button>
 
@@ -135,7 +135,7 @@ const DirectApiExample = () => {
     setLoading(true)
     try {
       // 直接调用 API 函数
-      const result = await sendReward({
+      const result = await sendAssetReward({
         telegramHandles: ['@user1'],
         assetId: 'USDT',
         amount: 50,
@@ -184,13 +184,13 @@ const FlexibleExample = () => {
   })
 
   // 同一个 sendReward 函数，用 Query 包装（比如用于轮询）
-  const pollingQuery = useApiQuery(['sendReward', 'polling'], sendReward, [params], {
+  const pollingQuery = useApiQuery(['sendReward', 'polling'], sendAssetReward, [params], {
     enabled: false,
     refetchInterval: 3000,
   })
 
   // 同一个 sendReward 函数，用 Mutation 包装（比如用于用户触发）
-  const sendMutation = useApiMutation(sendReward, {
+  const sendMutation = useApiMutation(sendAssetReward, {
     onSuccess: (data) => {
       console.log('Mutation 成功:', data)
     },

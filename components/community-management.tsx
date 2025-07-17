@@ -21,25 +21,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Search, Eye, CheckCircle, ExternalLink, Twitter, Github, MessageSquare, Users, Calendar, Mail, Shield, X, Bot, Hash } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useCommunityListQuery, useUpdateCommunityStatusMutation } from '@/hooks/use-api'
+import { Community } from '@prisma/client'
 
-// 根据真实API数据结构定义Community interface
-interface Community {
-  name: string
-  handle: string
-  logo: string
-  certification: boolean
-  creator_id: string
-  creator_tg_handle: string | null
-  creator_tg_nickname: string | null
-  creator_email: string | null
-  created_at: string
-  discord: string | null
-  github: string | null
-  twitter: string | null
-  tg_handle: string | null
-  tg_bot: string | null
-  tg_group: string | null
-}
+// 根据 Prisma schema 定义 Community interface
 
 // API响应数据结构
 interface ApiResponse {
@@ -60,65 +45,44 @@ export function CommunityManagement() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null)
   const [confirmCommunity, setConfirmCommunity] = useState<Community | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
 
-  // 从API获取社区数据
+  // 使用 useCommunityListQuery 获取社区数据
+  const { data: communityData, isLoading, error } = useCommunityListQuery({}, { enabled: true })
+
+  // 使用 updateCommunityStatus mutation
+  const updateCommunityStatusMutation = useUpdateCommunityStatusMutation({
+    onSuccess: (data) => {
+      toast({
+        title: data.message || '操作成功',
+        description: '社区认证状态已更新',
+      })
+    },
+    onError: (error) => {
+      toast({
+        title: '操作失败',
+        description: error.message || '更新社区认证状态失败',
+        variant: 'destructive',
+      })
+    },
+  })
+
+  // 当数据加载完成后，更新本地 communities 状态
   useEffect(() => {
-    const fetchCommunities = async () => {
-      setIsLoading(true)
-      try {
-        const response = await fetch(
-          'https://www.footprint.network/api/v1/public/card/ccb86aa3-970c-4897-9b21-aca5585ef67b/query?parameters=%5B%5D',
-          {
-            headers: {
-              accept: 'application/json',
-              'accept-language': 'en,zh-CN;q=0.9,zh;q=0.8',
-              'content-type': 'application/json',
-            },
-          }
-        )
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch communities')
-        }
-
-        const data: ApiResponse = await response.json()
-
-        // 将API数据转换为Community对象
-        const transformedCommunities: Community[] = data.data.rows.map((row) => ({
-          name: row[0] || '',
-          handle: row[1] || '',
-          logo: row[2] || '',
-          certification: row[3] || false,
-          creator_id: row[4] || '',
-          creator_tg_handle: row[5],
-          creator_tg_nickname: row[6],
-          creator_email: row[7],
-          created_at: row[8] || '',
-          discord: row[9],
-          github: row[10],
-          twitter: row[11],
-          tg_handle: row[12],
-          tg_bot: row[13],
-          tg_group: row[14],
-        }))
-
-        setCommunities(transformedCommunities)
-      } catch (error) {
-        console.error('Error fetching communities:', error)
-        toast({
-          title: '加载失败',
-          description: '无法加载社区数据，请稍后重试',
-          variant: 'destructive',
-        })
-      } finally {
-        setIsLoading(false)
-      }
+    if (communityData?.success && communityData?.data?.communities) {
+      // API 返回的是已经结构化的 Community 对象数组，无需转换
+      setCommunities(communityData.data.communities)
     }
 
-    fetchCommunities()
-  }, [toast])
+    if (error) {
+      console.error('Error fetching communities:', error)
+      toast({
+        title: '加载失败',
+        description: '无法加载社区数据，请稍后重试',
+        variant: 'destructive',
+      })
+    }
+  }, [communityData, error, toast])
 
   const filteredCommunities = communities.filter((community) => {
     const matchesFilter =
@@ -130,24 +94,35 @@ export function CommunityManagement() {
     return matchesFilter && matchesSearch
   })
 
-  const handleCertificationToggle = (communityHandle: string) => {
-    setCommunities((prev) =>
-      prev.map((community) => (community.handle === communityHandle ? { ...community, certification: !community.certification } : community))
-    )
-
+  const handleCertificationToggle = async (communityHandle: string) => {
     const community = communities.find((c) => c.handle === communityHandle)
-    const newStatus = !community?.certification
+    if (!community) return
 
-    toast({
-      title: newStatus ? '认证成功' : '取消认证',
-      description: newStatus ? '社区已成功获得认证' : '社区认证已取消',
-    })
+    const newStatus = !community.certification
 
-    if (selectedCommunity && selectedCommunity.handle === communityHandle) {
-      setSelectedCommunity({ ...selectedCommunity, certification: newStatus })
+    try {
+      // 调用 API 更新认证状态
+      await updateCommunityStatusMutation.mutateAsync([
+        {
+          handle: communityHandle,
+          certification: newStatus,
+        },
+      ])
+
+      // 更新本地状态
+      setCommunities((prev) => prev.map((c) => (c.handle === communityHandle ? { ...c, certification: newStatus } : c)))
+
+      // 更新选中的社区状态
+      if (selectedCommunity && selectedCommunity.handle === communityHandle) {
+        setSelectedCommunity({ ...selectedCommunity, certification: newStatus })
+      }
+    } catch (error) {
+      // 错误处理已经在 mutation 的 onError 中处理了
+      console.error('更新社区认证状态失败:', error)
+    } finally {
+      // 关闭确认对话框
+      setConfirmCommunity(null)
     }
-
-    setConfirmCommunity(null)
   }
 
   // 格式化创建时间
@@ -162,7 +137,9 @@ export function CommunityManagement() {
   // 渲染创建者信息
   const renderCreatorInfo = (community: Community) => {
     return (
-      <div className="space-y-2">{community.creator_tg_nickname && <div className="font-medium text-sm">{community.creator_tg_nickname}</div>}</div>
+      <div className="space-y-2">
+        <div className="font-medium text-sm">ID: {community.user_id}</div>
+      </div>
     )
   }
 
@@ -189,15 +166,6 @@ export function CommunityManagement() {
     //     </div>
     //   )
     // }
-    if (community.creator_email) {
-      socialLinks.push(
-        <div className="flex items-center gap-1 text-xs">
-          <span className="text-muted-foreground truncate max-w-[400px]" title={community.creator_email}>
-            Email: {community.creator_email}
-          </span>
-        </div>
-      )
-    }
     if (community.twitter) {
       socialLinks.push(
         <div key="twitter" className="flex items-center gap-1 text-xs">
@@ -209,80 +177,46 @@ export function CommunityManagement() {
       )
     }
 
-    if (community.github) {
+    if (community.tgHandle) {
       socialLinks.push(
-        <div key="github" className="flex items-center gap-1 text-xs">
-          {/* <Github className="h-3 w-3 text-gray-600" /> */}
-          <a
-            href={community.github}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:underline truncate  max-w-[400px"
-            title={community.github}
-          >
-            GitHub: {community.github}
-          </a>
-        </div>
-      )
-    }
-
-    if (community.discord) {
-      socialLinks.push(
-        <div key="discord" className="flex items-center gap-1 text-xs">
-          {/* <MessageSquare className="h-3 w-3 text-indigo-500" /> */}
-          <a
-            href={community.discord}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:underline truncate  max-w-[400px"
-            title={community.discord}
-          >
-            Discord: {community.discord}
-          </a>
-        </div>
-      )
-    }
-
-    if (community.tg_handle) {
-      socialLinks.push(
-        <div key="tg_handle" className="flex items-center gap-1 text-xs">
+        <div key="tgHandle" className="flex items-center gap-1 text-xs">
           {/* <Hash className="h-3 w-3 text-blue-400" /> */}
-          <span className="text-muted-foreground truncate  max-w-[400px" title={community.tg_handle}>
-            TG Handle: {community.tg_handle}
+          <span className="text-muted-foreground truncate  max-w-[400px" title={community.tgHandle}>
+            TG Handle: {community.tgHandle}
           </span>
         </div>
       )
     }
 
-    if (community.tg_group) {
+    if (community.tgGroup) {
       socialLinks.push(
-        <div key="tg_group" className="flex items-center gap-1 text-xs">
+        <div key="tgGroup" className="flex items-center gap-1 text-xs">
           {/* <Users className="h-3 w-3 text-blue-700" /> */}
           <a
-            href={community.tg_group}
+            href={community.tgGroup}
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground hover:underline truncate  max-w-[400px"
-            title={community.tg_group}
+            title={community.tgGroup}
           >
-            TG Group: {community.tg_group}
+            TG Group: {community.tgGroup}
           </a>
         </div>
       )
     }
 
-    if (community.tg_bot) {
+    if (community.tgBot) {
       socialLinks.push(
-        <div key="tg_bot" className="flex items-center gap-1 text-xs">
+        <div key="tgBot" className="flex items-center gap-1 text-xs">
           {/* <Bot className="h-3 w-3 text-blue-600" /> */}
           <a
-            href={community.tg_bot}
+            href={community.tgBot}
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground hover:underline truncate  max-w-[400px"
-            title={community.tg_bot}
+            title={community.tgBot}
           >
-            TG Bot: {community.tg_bot}
+            TG Bot: {community.tgBot}
           </a>
         </div>
       )
@@ -354,7 +288,7 @@ export function CommunityManagement() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={community.logo} alt={community.name} />
+                            <AvatarImage src={community.logo || ''} alt={community.name} />
                             <AvatarFallback>{community.name.slice(0, 2)}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1">
@@ -371,12 +305,12 @@ export function CommunityManagement() {
                       <TableCell>
                         <div className="text-sm flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {formatDate(community.created_at)}
+                          {formatDate(community.created_at.toString())}
                         </div>
                       </TableCell>
                       <TableCell>
                         {community.certification ? (
-                          <Badge variant="default" className="gap-1">
+                          <Badge variant="default" className="gap-1 min-w-[80px]">
                             <Shield className="h-3 w-3" />
                             已认证
                           </Badge>
@@ -385,6 +319,7 @@ export function CommunityManagement() {
                             variant="default"
                             size="sm"
                             onClick={() => setConfirmCommunity(community)}
+                            disabled={updateCommunityStatusMutation.isPending}
                             className="gap-1 bg-green-600 hover:bg-green-700 text-white shadow-md"
                           >
                             <CheckCircle className="h-3 w-3" />
@@ -403,7 +338,7 @@ export function CommunityManagement() {
                             <SheetHeader>
                               <SheetTitle className="flex items-center gap-2">
                                 <Avatar className="h-8 w-8">
-                                  <AvatarImage src={selectedCommunity?.logo} alt={selectedCommunity?.name} />
+                                  <AvatarImage src={selectedCommunity?.logo || ''} alt={selectedCommunity?.name} />
                                   <AvatarFallback>{selectedCommunity?.name.slice(0, 2)}</AvatarFallback>
                                 </Avatar>
                                 社区详情
@@ -433,7 +368,7 @@ export function CommunityManagement() {
                                     <label className="text-sm font-medium">创建时间</label>
                                     <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                                       <Calendar className="h-4 w-4" />
-                                      {formatDate(selectedCommunity.created_at)}
+                                      {formatDate(selectedCommunity.created_at.toString())}
                                     </p>
                                   </div>
 
@@ -454,6 +389,7 @@ export function CommunityManagement() {
                                         variant={selectedCommunity.certification ? 'destructive' : 'default'}
                                         size="sm"
                                         onClick={() => handleCertificationToggle(selectedCommunity.handle)}
+                                        disabled={updateCommunityStatusMutation.isPending}
                                         className={selectedCommunity.certification ? '' : 'bg-green-600 hover:bg-green-700 text-white'}
                                       >
                                         {selectedCommunity.certification ? (
@@ -476,7 +412,7 @@ export function CommunityManagement() {
                                 <div className="space-y-4">
                                   <h3 className="font-semibold text-lg">创建者信息</h3>
 
-                                  <div className="grid grid-cols-1 gap-3">
+                                  {/* <div className="grid grid-cols-1 gap-3">
                                     {selectedCommunity.creator_tg_nickname && (
                                       <div>
                                         <label className="text-sm font-medium">昵称</label>
@@ -498,7 +434,7 @@ export function CommunityManagement() {
                                         </p>
                                       </div>
                                     )}
-                                  </div>
+                                  </div> */}
                                 </div>
 
                                 {/* 社交媒体链接 */}
@@ -554,14 +490,14 @@ export function CommunityManagement() {
                                         </a>
                                       </div>
                                     )}
-                                    {selectedCommunity.tg_group && (
+                                    {selectedCommunity.tgGroup && (
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                           <Users className="h-4 w-4" />
                                           <span className="text-sm">Telegram 群组</span>
                                         </div>
                                         <a
-                                          href={selectedCommunity.tg_group}
+                                          href={selectedCommunity.tgGroup}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="text-sm text-blue-600 hover:underline flex items-center gap-1"
@@ -570,14 +506,14 @@ export function CommunityManagement() {
                                         </a>
                                       </div>
                                     )}
-                                    {selectedCommunity.tg_bot && (
+                                    {selectedCommunity.tgBot && (
                                       <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                           <MessageSquare className="h-4 w-4" />
                                           <span className="text-sm">Telegram Bot</span>
                                         </div>
                                         <a
-                                          href={selectedCommunity.tg_bot}
+                                          href={selectedCommunity.tgBot}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           className="text-sm text-blue-600 hover:underline flex items-center gap-1"
@@ -618,10 +554,11 @@ export function CommunityManagement() {
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => confirmCommunity && handleCertificationToggle(confirmCommunity.handle)}
+              disabled={updateCommunityStatusMutation.isPending}
               className="bg-green-600 hover:bg-green-700"
             >
               <CheckCircle className="h-4 w-4 mr-2" />
-              确认认证
+              {updateCommunityStatusMutation.isPending ? '处理中...' : '确认认证'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

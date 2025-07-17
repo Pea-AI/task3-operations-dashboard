@@ -1,14 +1,14 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Building2, Gift, History, LogOut, Menu } from "lucide-react"
-import { CommunityManagement } from "@/components/community-management"
-import { RewardDistribution } from "@/components/reward-distribution"
-import { DistributionHistory } from "@/components/distribution-history"
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Building2, Gift, History, LogOut, Menu } from 'lucide-react'
+import { CommunityManagement } from '@/components/community-management'
+import { RewardDistribution } from '@/components/reward-distribution'
+import { DistributionHistory } from '@/components/distribution-history'
 
 interface DashboardProps {
   user: any
@@ -16,22 +16,22 @@ interface DashboardProps {
 }
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState("community")
+  const [activeTab, setActiveTab] = useState('community')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const menuItems = [
-    { id: "community", label: "社区管理", icon: Building2 },
-    { id: "rewards", label: "奖励发放", icon: Gift },
-    { id: "history", label: "发放历史", icon: History },
+    { id: 'community', label: '社区管理', icon: Building2 },
+    { id: 'rewards', label: '奖励发放', icon: Gift },
+    { id: 'history', label: '发放历史', icon: History },
   ]
 
   const renderContent = () => {
     switch (activeTab) {
-      case "community":
+      case 'community':
         return <CommunityManagement />
-      case "rewards":
+      case 'rewards':
         return <RewardDistribution />
-      case "history":
+      case 'history':
         return <DistributionHistory />
       default:
         return <CommunityManagement />
@@ -39,7 +39,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   }
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white z-[999]">
       <div className="p-6">
         <h2 className="text-lg font-semibold">运营管理后台</h2>
       </div>
@@ -50,7 +50,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
             return (
               <li key={item.id}>
                 <Button
-                  variant={activeTab === item.id ? "secondary" : "ghost"}
+                  variant={activeTab === item.id ? 'secondary' : 'ghost'}
                   className="w-full justify-start"
                   onClick={() => {
                     setActiveTab(item.id)
@@ -97,16 +97,14 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 <SidebarContent />
               </SheetContent>
             </Sheet>
-            <h1 className="text-xl font-semibold ml-2 md:ml-0">
-              {menuItems.find((item) => item.id === activeTab)?.label}
-            </h1>
+            <h1 className="text-xl font-semibold ml-2 md:ml-0">{menuItems.find((item) => item.id === activeTab)?.label}</h1>
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                  <AvatarImage src={user.avatar || '/placeholder.svg'} alt={user.name} />
                   <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                 </Avatar>
               </Button>

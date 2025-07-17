@@ -4,7 +4,7 @@ import { config } from './config'
 
 // 创建 axios 实例
 export const apiClient = axios.create({
-  baseURL: `${config.apiBaseUrl}/api`,
+  baseURL: `${config.apiTask3BaseUrl}/api`,
   timeout: 30000, // 30秒超时
   headers: {
     'Content-Type': 'application/json',
@@ -17,9 +17,10 @@ apiClient.interceptors.request.use((requestConfig) => {
   requestConfig.headers['x-admin'] = config.adminToken
 
   // 如果有用户 token，也添加到请求头
-  const token = localStorage.getItem('token')
+  const token = localStorage?.getItem('token')
   if (token) {
-    requestConfig.headers.Authorization = `Bearer ${token}`
+    // requestConfig.headers.Authorization = `Bearer ${token}`
+    requestConfig.headers['token'] = token
   }
 
   return requestConfig
@@ -27,12 +28,18 @@ apiClient.interceptors.request.use((requestConfig) => {
 
 // 响应拦截器 - 处理错误
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // 检查响应中的 code 是否为 0
+    if (response.data?.code !== undefined && response.data.code !== 0) {
+      const errorMessage = response.data.message || 'Request failed with non-zero code'
+      return Promise.reject(new Error(errorMessage))
+    }
+    return response
+  },
   (error) => {
     // 处理 401 未授权
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+      alert('没有权限')
     }
 
     // 处理其他错误

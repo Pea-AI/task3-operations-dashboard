@@ -14,7 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Upload, Send, FileSpreadsheet, X } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { useSendRewardMutation } from '@/hooks/use-api'
+import { useSendRewardMutation, useSendPointRewardMutation, sendPointReward, sendAssetReward, type RewardResponse } from '@/hooks/use-api'
+import * as XLSX from 'xlsx'
 
 interface RewardRecord {
   id: string
@@ -23,14 +24,19 @@ interface RewardRecord {
   assetType: string
   amount: number
   status: 'pending' | 'sending' | 'success' | 'failed'
+  flowName?: string
+  flowDescription?: string
+  assetValue?: string // 存储原始的资产类型值
 }
 
 const assetTypes = [
-  { value: 'qluck', label: 'QLuck', assetId: '1002' },
-  { value: 'bluck', label: 'BLuck', assetId: '1003' },
-  { value: 'usdt', label: 'USDT', assetId: '663cbd6c515cf0d9f9d93e14' },
-  { value: 'ton', label: 'TON', assetId: '1005' },
-  { value: 'pepe', label: 'PEPE', assetId: '1006' },
+  { value: 'point', label: 'Points 积分', assetId: '' },
+  { value: 'qluck', label: 'QLuck', assetId: process.env.NODE_ENV === 'production' ? '67d24dc62c8eb74f7dbbd3cc' : '67c179d8b4fb1c2773444cbf' },
+  { value: 'bluck', label: 'BLuck', assetId: process.env.NODE_ENV === 'production' ? '67e1407abc217a273fbe1e36' : '67c179d8b4fb1c2773444bbb' },
+  { value: 'usdt', label: 'USDT', assetId: process.env.NODE_ENV === 'production' ? '663cbd6c515cf0d9f9d93e14' : '663b5c9c9cda043b75cbbb0e' },
+  { value: 'ton', label: 'TON', assetId: process.env.NODE_ENV === 'production' ? '66cc5ab5515cf0d9f969fbaa' : '66962c11ca03b3632ae437cb' },
+  { value: 'pepe', label: 'PEPE', assetId: process.env.NODE_ENV === 'production' ? '669f3278515cf0d9f9571a8a' : '66b2f57bca03b3632ad41d69' },
+  { value: 'doge', label: 'DOGE', assetId: process.env.NODE_ENV === 'production' ? '' : '66962af7ca03b3632ae3e6f7' },
 ]
 
 export function RewardDistribution() {
@@ -50,11 +56,48 @@ export function RewardDistribution() {
 
   // 使用发送奖励的 API
   const sendRewardMutation = useSendRewardMutation({
-    onSuccess: (data: any) => {
+    onSuccess: (data: RewardResponse) => {
+      const successCount = data.successHandles?.length || 0
+      const failedCount = (data.notFoundUserHandles?.length || 0) + ((data.foundUserHandles?.length || 0) - successCount)
+
       toast({
-        title: '发送成功',
-        description: `奖励已成功发送给 ${singleReward.userInputs.length} 个用户`,
+        title: '发送完成',
+        description: `成功: ${successCount} 个用户，失败: ${failedCount} 个用户`,
+        variant: failedCount > 0 ? 'destructive' : 'default',
       })
+
+      // 重置表单
+      setSingleReward({
+        userType: 'tgHandle',
+        userInputs: [],
+        assetType: '',
+        amount: '',
+        flowName: '',
+        flowDescription: '',
+      })
+      setUserInputValue('')
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '发送失败',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
+  // 使用发送积分奖励的 API
+  const sendPointRewardMutation = useSendPointRewardMutation({
+    onSuccess: (data: RewardResponse) => {
+      const successCount = data.successHandles?.length || 0
+      const failedCount = (data.notFoundUserHandles?.length || 0) + ((data.foundUserHandles?.length || 0) - successCount)
+
+      toast({
+        title: '发送完成',
+        description: `积分奖励 - 成功: ${successCount} 个用户，失败: ${failedCount} 个用户`,
+        variant: failedCount > 0 ? 'destructive' : 'default',
+      })
+
       // 重置表单
       setSingleReward({
         userType: 'tgHandle',
@@ -91,9 +134,9 @@ export function RewardDistribution() {
       return
     }
 
-    // 获取选中的资产类型的 assetId
+    // 获取选中的资产类型
     const selectedAsset = assetTypes.find((asset) => asset.value === singleReward.assetType)
-    if (!selectedAsset?.assetId) {
+    if (!selectedAsset) {
       toast({
         title: '输入错误',
         description: '请选择有效的奖励类型',
@@ -102,58 +145,35 @@ export function RewardDistribution() {
       return
     }
 
-    // 发送奖励请求
-    sendRewardMutation.mutate([
-      {
-        telegramHandles: singleReward.userInputs,
+    // 准备请求参数
+    const baseParams = {
+      telegramHandles: singleReward.userInputs,
+      amount: Number(singleReward.amount),
+      flowName: singleReward.flowName,
+      flowDescription: singleReward.flowDescription,
+      sender: 'admin', // 可以根据需要修改
+    }
+
+    // 根据奖励类型选择不同的API
+    if (singleReward.assetType === 'point') {
+      // 发送积分奖励
+      sendPointRewardMutation.mutate(baseParams)
+    } else {
+      // 发送资产奖励
+      if (!selectedAsset.assetId) {
+        toast({
+          title: '输入错误',
+          description: '请选择有效的奖励类型',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      sendRewardMutation.mutate({
+        ...baseParams,
         assetId: selectedAsset.assetId,
-        amount: Number(singleReward.amount),
-        flowName: singleReward.flowName,
-        flowDescription: singleReward.flowDescription,
-        sender: 'admin', // 可以根据需要修改
-      },
-    ])
-  }
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    // Simulate Excel parsing
-    const mockData: RewardRecord[] = [
-      {
-        id: '1',
-        userId: '12345',
-        tgHandle: '@user1',
-        assetType: 'USDT',
-        amount: 10,
-        status: 'pending',
-      },
-      {
-        id: '2',
-        userId: '12346',
-        tgHandle: '@user2',
-        assetType: 'Points',
-        amount: 100,
-        status: 'pending',
-      },
-      {
-        id: '3',
-        userId: '12347',
-        tgHandle: '@user3',
-        assetType: 'TON',
-        amount: 5,
-        status: 'pending',
-      },
-    ]
-
-    setBatchRewards(mockData)
-    setSelectedRewards(mockData.map((r) => r.id))
-
-    toast({
-      title: '文件上传成功',
-      description: `已解析 ${mockData.length} 条奖励记录`,
-    })
+      })
+    }
   }
 
   const handleBatchSend = async () => {
@@ -171,26 +191,265 @@ export function RewardDistribution() {
     // Update status to sending
     setBatchRewards((prev) => prev.map((reward) => (selectedRewards.includes(reward.id) ? { ...reward, status: 'sending' as const } : reward)))
 
-    // Simulate batch sending
-    for (let i = 0; i < selectedRewards.length; i++) {
-      setTimeout(() => {
-        setBatchRewards((prev) =>
-          prev.map((reward) =>
-            reward.id === selectedRewards[i] ? { ...reward, status: Math.random() > 0.1 ? 'success' : ('failed' as const) } : reward
-          )
-        )
+    // 将选中的奖励按类型分组
+    const selectedRewardsData = batchRewards.filter((reward) => selectedRewards.includes(reward.id))
+    const pointRewards = selectedRewardsData.filter((reward) => reward.assetValue === 'point')
+    const assetRewards = selectedRewardsData.filter((reward) => reward.assetValue !== 'point')
 
-        if (i === selectedRewards.length - 1) {
-          setIsLoading(false)
-          toast({
-            title: '批量发送完成',
-            description: `已处理 ${selectedRewards.length} 条记录`,
-          })
+    let successCount = 0
+    let failedCount = 0
+
+    // 处理积分奖励
+    if (pointRewards.length > 0) {
+      // 按 flowName 和 flowDescription 分组
+      const pointGroups = pointRewards.reduce((groups, reward) => {
+        const key = `${reward.flowName}-${reward.flowDescription}`
+        if (!groups[key]) {
+          groups[key] = []
         }
-      }, (i + 1) * 1000)
-    }
-  }
+        groups[key].push(reward)
+        return groups
+      }, {} as Record<string, typeof pointRewards>)
 
+      for (const group of Object.values(pointGroups)) {
+        try {
+          const baseParams = {
+            telegramHandles: group.map((r) => r.tgHandle!),
+            amount: group[0].amount, // 假设同组内金额相同
+            flowName: group[0].flowName!,
+            flowDescription: group[0].flowDescription!,
+            sender: 'admin',
+          }
+
+          const response: RewardResponse = await sendPointReward(baseParams)
+
+          // 根据API响应更新每个用户的状态
+          setBatchRewards((prev) =>
+            prev.map((reward) => {
+              const groupReward = group.find((g) => g.id === reward.id)
+              if (!groupReward) return reward
+
+              const userHandle = groupReward.tgHandle!
+              let newStatus: 'success' | 'failed' = 'failed'
+
+              if (response.successHandles?.includes(userHandle)) {
+                newStatus = 'success'
+              } else if (response.notFoundUserHandles?.includes(userHandle)) {
+                newStatus = 'failed'
+              } else if (response.foundUserHandles?.includes(userHandle)) {
+                // 用户存在但发送失败
+                newStatus = 'failed'
+              } else {
+                // 未知状态，默认为失败
+                newStatus = 'failed'
+              }
+
+              return { ...reward, status: newStatus }
+            })
+          )
+
+          // 计算成功和失败的数量
+          const groupSuccessCount = group.filter((g) => response.successHandles?.includes(g.tgHandle!)).length
+          const groupFailedCount = group.length - groupSuccessCount
+          successCount += groupSuccessCount
+          failedCount += groupFailedCount
+        } catch (error) {
+          // 整组发送失败
+          setBatchRewards((prev) => prev.map((reward) => (group.find((g) => g.id === reward.id) ? { ...reward, status: 'failed' as const } : reward)))
+          failedCount += group.length
+        }
+      }
+    }
+
+    // 处理资产奖励
+    if (assetRewards.length > 0) {
+      // 按 assetType, flowName 和 flowDescription 分组
+      const assetGroups = assetRewards.reduce((groups, reward) => {
+        const key = `${reward.assetValue}-${reward.flowName}-${reward.flowDescription}`
+        if (!groups[key]) {
+          groups[key] = []
+        }
+        groups[key].push(reward)
+        return groups
+      }, {} as Record<string, typeof assetRewards>)
+
+      for (const group of Object.values(assetGroups)) {
+        try {
+          const assetType = assetTypes.find((a) => a.value === group[0].assetValue)
+          if (!assetType?.assetId) {
+            throw new Error(`无效的资产类型: ${group[0].assetValue}`)
+          }
+
+          const baseParams = {
+            telegramHandles: group.map((r) => r.tgHandle!),
+            assetId: assetType.assetId,
+            amount: group[0].amount, // 假设同组内金额相同
+            flowName: group[0].flowName!,
+            flowDescription: group[0].flowDescription!,
+            sender: 'admin',
+          }
+
+          const response: RewardResponse = await sendAssetReward(baseParams)
+
+          // 根据API响应更新每个用户的状态
+          setBatchRewards((prev) =>
+            prev.map((reward) => {
+              const groupReward = group.find((g) => g.id === reward.id)
+              if (!groupReward) return reward
+
+              const userHandle = groupReward.tgHandle!
+              let newStatus: 'success' | 'failed' = 'failed'
+
+              if (response.successHandles?.includes(userHandle)) {
+                newStatus = 'success'
+              } else if (response.notFoundUserHandles?.includes(userHandle)) {
+                newStatus = 'failed'
+              } else if (response.foundUserHandles?.includes(userHandle)) {
+                // 用户存在但发送失败
+                newStatus = 'failed'
+              } else {
+                // 未知状态，默认为失败
+                newStatus = 'failed'
+              }
+
+              return { ...reward, status: newStatus }
+            })
+          )
+
+          // 计算成功和失败的数量
+          const groupSuccessCount = group.filter((g) => response.successHandles?.includes(g.tgHandle!)).length
+          const groupFailedCount = group.length - groupSuccessCount
+          successCount += groupSuccessCount
+          failedCount += groupFailedCount
+        } catch (error) {
+          // 整组发送失败
+          setBatchRewards((prev) => prev.map((reward) => (group.find((g) => g.id === reward.id) ? { ...reward, status: 'failed' as const } : reward)))
+          failedCount += group.length
+        }
+      }
+    }
+
+    setIsLoading(false)
+    toast({
+      title: '批量发送完成',
+      description: `成功: ${successCount} 条，失败: ${failedCount} 条`,
+    })
+  }
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      toast({
+        title: '文件格式错误',
+        description: '请上传 .xlsx 或 .xls 格式的文件',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+
+        // 转换为JSON数据
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
+
+        // 验证并转换数据
+        const parsedData: RewardRecord[] = []
+        const errors: string[] = []
+
+        jsonData.forEach((row, index) => {
+          const rowNum = index + 2 // Excel行号从2开始（去掉标题行）
+
+          // 验证必填字段
+          if (!row.telegramHandle || !row.assetType || !row.amount || !row.flowName || !row.flowDescription) {
+            errors.push(`第${rowNum}行：缺少必填字段`)
+            return
+          }
+
+          // 验证telegramHandle格式
+          const telegramHandle = row.telegramHandle.toString().trim()
+          if (!telegramHandle.startsWith('@')) {
+            errors.push(`第${rowNum}行：telegramHandle 必须以@开头`)
+            return
+          }
+
+          // 验证assetType
+          const assetType = row.assetType.toString().trim()
+          const validAssetTypes = assetTypes.map((a) => a.value)
+          if (!validAssetTypes.includes(assetType)) {
+            errors.push(`第${rowNum}行：不支持的资产类型 ${assetType}`)
+            return
+          }
+
+          // 验证amount
+          const amount = Number(row.amount)
+          if (isNaN(amount) || amount <= 0) {
+            errors.push(`第${rowNum}行：奖励数量必须是大于0的数字`)
+            return
+          }
+
+          // 检查资产类型是否有效（非积分类型需要有assetId）
+          const assetConfig = assetTypes.find((a) => a.value === assetType)
+          if (assetType !== 'point' && !assetConfig?.assetId) {
+            errors.push(`第${rowNum}行：资产类型 ${assetType} 在当前环境下不可用`)
+            return
+          }
+
+          parsedData.push({
+            id: (index + 1).toString(),
+            tgHandle: telegramHandle,
+            assetType: assetConfig?.label || assetType,
+            amount: amount,
+            status: 'pending',
+            // 存储额外信息供后续使用
+            flowName: row.flowName.toString().trim(),
+            flowDescription: row.flowDescription.toString().trim(),
+            assetValue: assetType, // 存储原始值
+          } as RewardRecord & { flowName: string; flowDescription: string; assetValue: string })
+        })
+
+        if (errors.length > 0) {
+          toast({
+            title: '文件解析失败',
+            description: errors.slice(0, 3).join('; ') + (errors.length > 3 ? '...' : ''),
+            variant: 'destructive',
+          })
+          return
+        }
+
+        if (parsedData.length === 0) {
+          toast({
+            title: '文件为空',
+            description: '没有找到有效的奖励记录',
+            variant: 'destructive',
+          })
+          return
+        }
+
+        setBatchRewards(parsedData)
+        setSelectedRewards(parsedData.map((r) => r.id))
+
+        toast({
+          title: '文件上传成功',
+          description: `已解析 ${parsedData.length} 条奖励记录`,
+        })
+      } catch (error) {
+        toast({
+          title: '文件解析失败',
+          description: '请检查文件格式是否正确',
+          variant: 'destructive',
+        })
+      }
+    }
+
+    reader.readAsArrayBuffer(file)
+  }
   const toggleRewardSelection = (rewardId: string) => {
     setSelectedRewards((prev) => (prev.includes(rewardId) ? prev.filter((id) => id !== rewardId) : [...prev, rewardId]))
   }
@@ -243,6 +502,77 @@ export function RewardDistribution() {
     }
   }
 
+  const handleDownloadTemplate = () => {
+    // 创建模板数据
+    const templateData = [
+      {
+        telegramHandle: '@example_user1',
+        assetType: 'point',
+        amount: 100,
+        flowName: 'Daily Check-in',
+        flowDescription: 'Daily check-in reward',
+      },
+      {
+        telegramHandle: '@example_user2',
+        assetType: 'usdt',
+        amount: 10,
+        flowName: 'Task Completion',
+        flowDescription: 'Task completion reward',
+      },
+      {
+        telegramHandle: '@example_user3',
+        assetType: 'ton',
+        amount: 5,
+        flowName: 'Weekly Bonus',
+        flowDescription: 'Weekly bonus reward',
+      },
+    ]
+
+    // 创建工作表
+    const worksheet = XLSX.utils.json_to_sheet(templateData)
+
+    // 设置列宽
+    const colWidths = [
+      { wch: 20 }, // telegramHandle
+      { wch: 15 }, // assetType
+      { wch: 10 }, // amount
+      { wch: 25 }, // flowName
+      { wch: 30 }, // flowDescription
+    ]
+    worksheet['!cols'] = colWidths
+
+    // 创建工作簿
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Reward Template')
+
+    // 添加说明工作表
+    const instructionsData = [
+      { Field: 'telegramHandle', Description: 'Telegram用户名，格式：@username', Required: 'Yes', Example: '@example_user1' },
+      { Field: 'assetType', Description: '奖励类型', Required: 'Yes', Example: 'point, qluck, bluck, usdt, ton, pepe, doge' },
+      { Field: 'amount', Description: '奖励数量', Required: 'Yes', Example: '100' },
+      { Field: 'flowName', Description: '流程名称', Required: 'Yes', Example: 'Daily Check-in' },
+      { Field: 'flowDescription', Description: '流程描述', Required: 'Yes', Example: 'Daily check-in reward' },
+    ]
+
+    const instructionsWorksheet = XLSX.utils.json_to_sheet(instructionsData)
+    instructionsWorksheet['!cols'] = [
+      { wch: 20 }, // Field
+      { wch: 40 }, // Description
+      { wch: 10 }, // Required
+      { wch: 30 }, // Example
+    ]
+    XLSX.utils.book_append_sheet(workbook, instructionsWorksheet, 'Instructions')
+
+    // 下载文件
+    const fileName = `reward-template-${new Date().toISOString().split('T')[0]}.xlsx`
+    XLSX.writeFile(workbook, fileName)
+
+    toast({
+      title: '下载成功',
+      description: '模板文件已下载到您的设备',
+    })
+  }
+
   const getStatusBadge = (status: RewardRecord['status']) => {
     const variants = {
       pending: { variant: 'secondary' as const, text: '待发送' },
@@ -291,6 +621,15 @@ export function RewardDistribution() {
                       value={userInputValue}
                       onChange={handleUserInputChange}
                       onKeyDown={handleUserInputKeyDown}
+                      onBlur={() => {
+                        if (userInputValue.trim()) {
+                          setSingleReward((prev) => ({
+                            ...prev,
+                            userInputs: [...prev.userInputs, userInputValue.trim()],
+                          }))
+                          setUserInputValue('')
+                        }
+                      }}
                       className="flex-1 rounded-l-none"
                     />
                   </div>
@@ -316,13 +655,17 @@ export function RewardDistribution() {
                 <div className="space-y-2">
                   <Label htmlFor="amount">奖励</Label>
                   <div className="flex">
-                    <Select value={singleReward.assetType} onValueChange={(value) => setSingleReward((prev) => ({ ...prev, assetType: value }))}>
+                    <Select
+                      defaultValue="point"
+                      value={singleReward.assetType}
+                      onValueChange={(value) => setSingleReward((prev) => ({ ...prev, assetType: value }))}
+                    >
                       <SelectTrigger className="w-48 rounded-r-none">
                         <SelectValue placeholder="选择奖励类型" />
                       </SelectTrigger>
                       <SelectContent>
                         {assetTypes.map((asset) => (
-                          <SelectItem key={asset.value} value={asset.value}>
+                          <SelectItem key={asset.value} value={asset.value} disabled={asset.value !== 'point' && !asset.assetId}>
                             {asset.label}
                           </SelectItem>
                         ))}
@@ -362,9 +705,13 @@ export function RewardDistribution() {
                 </div>
               </div>
 
-              <Button onClick={handleSingleRewardSubmit} disabled={sendRewardMutation.isPending} className="w-full md:w-auto">
+              <Button
+                onClick={handleSingleRewardSubmit}
+                disabled={sendRewardMutation.isPending || sendPointRewardMutation.isPending}
+                className="w-full md:w-auto"
+              >
                 <Send className="h-4 w-4 mr-2" />
-                {sendRewardMutation.isPending ? '发送中...' : '发送奖励'}
+                {sendRewardMutation.isPending || sendPointRewardMutation.isPending ? '发送中...' : '发送奖励'}
               </Button>
             </CardContent>
           </Card>
@@ -387,7 +734,7 @@ export function RewardDistribution() {
                     <Input id="file-upload" type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
                   </Label>
                 </div>
-                <Button variant="outline" className="md:w-auto bg-transparent">
+                <Button variant="outline" className="md:w-auto bg-transparent" onClick={handleDownloadTemplate}>
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   下载模板
                 </Button>
