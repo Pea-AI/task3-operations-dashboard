@@ -98,3 +98,33 @@ model FtToken {
 
   @@map("ft_token")
 }
+
+// 推广配置状态枚举
+enum PROMOTION_STATUS {
+  PROMOTION_STATUS_ACTIVE
+  PROMOTION_STATUS_INACTIVE
+}
+
+// 推广平台枚举
+enum PROMOTION_PLATFORM {
+  PROMOTION_PLATFORM_LINE
+  PROMOTION_PLATFORM_TELEGRAM
+}
+
+// 推广配置模型
+model Promotion {
+  id          String             @id @default(auto()) @map("_id") @db.ObjectId
+  title       String             @map("title") // 推广标题
+  img         String             @map("img") // 推广图片URL
+  url         String             @map("url") // 推广链接
+  tag         String             @map("tag") // 推广标签
+  platform    PROMOTION_PLATFORM @map("platform") // 推广平台
+  page        String             @map("page") // 页面
+  priority    Int                @default(1) @map("priority") // 优先级
+  eventIndex  Int                @default(0) @map("eventIndex") // 事件索引
+  status      PROMOTION_STATUS   @default(PROMOTION_STATUS_ACTIVE) @map("status") // 状态
+  created_at  DateTime           @default(now()) @map("created_at") // 创建时间
+  updated_at  DateTime           @updatedAt @map("updated_at") // 更新时间
+
+  @@map("ft_promotion")
+}

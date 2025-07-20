@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Building2, Gift, History, LogOut, Menu } from 'lucide-react'
+import { Building2, Gift, History, LogOut, Menu, Settings } from 'lucide-react'
 import { CommunityManagement } from '@/components/community-management'
 import { RewardDistribution } from '@/components/reward-distribution'
 import { DistributionHistory } from '@/components/distribution-history'
+import { PromotionManagement } from '@/components/promotion-management'
 
 interface DashboardProps {
   user: any
@@ -23,6 +24,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     { id: 'community', label: '社区管理', icon: Building2 },
     { id: 'rewards', label: '奖励发放', icon: Gift },
     { id: 'history', label: '发放历史', icon: History },
+    { id: 'promotion', label: '推广配置', icon: Settings },
   ]
 
   const renderContent = () => {
@@ -33,6 +35,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         return <RewardDistribution />
       case 'history':
         return <DistributionHistory />
+      case 'promotion':
+        return <PromotionManagement />
       default:
         return <CommunityManagement />
     }
