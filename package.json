@@ -3,18 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
     "dev": "next dev",
-    "lint": "next lint",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:reset": "prisma db push --force-reset",
-    "db:studio": "prisma studio",
-    "db:init": "npm run db:generate && npm run db:push",
-    "setup:env": "node scripts/setup-env.js",
-    "test:db": "node scripts/test-db-connection.js",
-    "create:env": "node scripts/create-env-files.js"
+    "lint": "next lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

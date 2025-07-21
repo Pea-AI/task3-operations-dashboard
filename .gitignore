@@ -6,7 +6,9 @@
 # next.js
 /.next/
 /out/
-
+/mongo-data/
+/lib/generated/
+data
 # production
 /build
 

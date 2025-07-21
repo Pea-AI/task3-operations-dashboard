@@ -1,0 +1,11 @@
+# docker-compose.yml
+version: '3.8'
+services:
+  mongo:
+    image: mongo:6
+    command: [ "mongod", "--replSet", "rs0", "--bind_ip_all" ]
+    volumes:
+      - ./data:/data/db
+      - ./init-replica.sh:/docker-entrypoint-initdb.d/init-replica.sh
+    ports:
+      - "27017:27017"
