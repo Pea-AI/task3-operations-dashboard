@@ -63,7 +63,7 @@ export function PromotionManagement() {
     img: '',
     url: '',
     tag: '',
-    platform: 'line',
+    platform: 'telegram',
     page: 'plaza',
     priority: 1,
     eventIndex: 0,
@@ -190,7 +190,7 @@ export function PromotionManagement() {
       img: '',
       url: '',
       tag: '',
-      platform: 'line',
+      platform: 'telegram',
       page: 'plaza',
       priority: 1,
       eventIndex: 0,
@@ -434,8 +434,8 @@ export function PromotionManagement() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="line">Line</SelectItem>
                     <SelectItem value="telegram">Telegram</SelectItem>
+                    <SelectItem value="line">Line</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

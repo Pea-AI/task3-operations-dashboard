@@ -18,12 +18,21 @@ export async function GET(request: NextRequest) {
     // 构建查询条件
     const where: any = {}
 
+    // 默认排除已删除的记录
     if (status) {
-      where.status = status === 'active' ? 'PROMOTION_STATUS_ACTIVE' : 'PROMOTION_STATUS_INACTIVE'
+      where.status = status === 'active' ? 'ACTIVE' : status === 'inactive' ? 'INACTIVE' : 'DELETED'
+    } else {
+      // 如果没有指定状态，默认排除已删除的记录
+      where.status = { not: 'DELETED' }
     }
 
     if (platform) {
-      where.platform = platform === 'line' ? 'PROMOTION_PLATFORM_LINE' : 'PROMOTION_PLATFORM_TELEGRAM'
+      const platformMap: Record<string, string> = {
+        line: 'LINE',
+        telegram: 'TELEGRAM',
+        web: 'WEB',
+      }
+      where.platform = platformMap[platform]
     }
 
     if (page_filter) {
@@ -53,11 +62,18 @@ export async function GET(request: NextRequest) {
     ])
 
     // 格式化返回数据
-    const formattedPromotions = promotions.map((promotion) => ({
-      ...promotion,
-      status: promotion.status === 'PROMOTION_STATUS_ACTIVE' ? 'active' : 'inactive',
-      platform: promotion.platform === 'PROMOTION_PLATFORM_LINE' ? 'line' : 'telegram',
-    }))
+    const formattedPromotions = promotions.map((promotion: any) => {
+      const platformMap: Record<string, string> = {
+        LINE: 'line',
+        TELEGRAM: 'telegram',
+        WEB: 'web',
+      }
+      return {
+        ...promotion,
+        status: promotion.status === 'ACTIVE' ? 'active' : promotion.status === 'INACTIVE' ? 'inactive' : 'deleted',
+        platform: platformMap[promotion.platform] || promotion.platform,
+      }
+    })
 
     return NextResponse.json({
       success: true,
@@ -103,22 +119,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证平台值
-    if (!['line', 'telegram'].includes(platform)) {
+    if (!['line', 'telegram', 'web'].includes(platform)) {
       return NextResponse.json(
         {
           success: false,
-          message: '平台必须是 line 或 telegram',
+          message: '平台必须是 line、telegram 或 web',
         },
         { status: 400 }
       )
     }
 
     // 验证状态值
-    if (status && !['active', 'inactive'].includes(status)) {
+    if (status && !['active', 'inactive', 'deleted'].includes(status)) {
       return NextResponse.json(
         {
           success: false,
-          message: '状态必须是 active 或 inactive',
+          message: '状态必须是 active、inactive 或 deleted',
         },
         { status: 400 }
       )
@@ -131,19 +147,24 @@ export async function POST(request: NextRequest) {
         img,
         url,
         tag,
-        platform: platform === 'line' ? 'PROMOTION_PLATFORM_LINE' : 'PROMOTION_PLATFORM_TELEGRAM',
+        platform: platform === 'line' ? 'LINE' : platform === 'telegram' ? 'TELEGRAM' : 'WEB',
         page,
         priority: priority || 1,
         eventIndex: eventIndex || 0,
-        status: status === 'inactive' ? 'PROMOTION_STATUS_INACTIVE' : 'PROMOTION_STATUS_ACTIVE',
+        status: status === 'inactive' ? 'INACTIVE' : status === 'deleted' ? 'DELETED' : 'ACTIVE',
       },
     })
 
     // 格式化返回数据
+    const platformMap: Record<string, string> = {
+      LINE: 'line',
+      TELEGRAM: 'telegram',
+      WEB: 'web',
+    }
     const formattedPromotion = {
       ...promotion,
-      status: promotion.status === 'PROMOTION_STATUS_ACTIVE' ? 'active' : 'inactive',
-      platform: promotion.platform === 'PROMOTION_PLATFORM_LINE' ? 'line' : 'telegram',
+      status: promotion.status === 'ACTIVE' ? 'active' : promotion.status === 'INACTIVE' ? 'inactive' : 'deleted',
+      platform: platformMap[promotion.platform] || promotion.platform,
     }
 
     return NextResponse.json({
@@ -163,6 +184,32 @@ export async function POST(request: NextRequest) {
           success: false,
           message: '您的数据库配置不支持事务操作。请确保MongoDB配置为副本集(Replica Set)或使用MongoDB Atlas。',
           details: '单实例MongoDB不支持事务，请升级您的数据库部署。',
+          error: process.env.NODE_ENV === 'development' ? error : undefined,
+        },
+        { status: 500 }
+      )
+    }
+
+    // 处理数据库表不存在的错误
+    if (error.code === 'P2021' || error.message.includes('table') || error.message.includes('collection')) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: '数据库表不存在，请运行数据库初始化命令。',
+          details: '请联系管理员执行 "npm run db:init" 初始化数据库。',
+          error: process.env.NODE_ENV === 'development' ? error : undefined,
+        },
+        { status: 500 }
+      )
+    }
+
+    // 处理Prisma客户端验证错误
+    if (error.name === 'PrismaClientValidationError') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: '数据库操作验证失败，可能是数据库结构不匹配。',
+          details: '请确保数据库已正确初始化，运行 "npm run db:init" 重新初始化。',
           error: process.env.NODE_ENV === 'development' ? error : undefined,
         },
         { status: 500 }
@@ -212,6 +259,17 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // 检查是否已经被删除
+    if (existingPromotion.status === 'DELETED') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: '无法更新已删除的推广配置',
+        },
+        { status: 400 }
+      )
+    }
+
     // 构建更新数据
     const updateData: any = {}
 
@@ -224,29 +282,29 @@ export async function PUT(request: NextRequest) {
     if (eventIndex !== undefined) updateData.eventIndex = eventIndex
 
     if (platform !== undefined) {
-      if (!['line', 'telegram'].includes(platform)) {
+      if (!['line', 'telegram', 'web'].includes(platform)) {
         return NextResponse.json(
           {
             success: false,
-            message: '平台必须是 line 或 telegram',
+            message: '平台必须是 line、telegram 或 web',
           },
           { status: 400 }
         )
       }
-      updateData.platform = platform === 'line' ? 'PROMOTION_PLATFORM_LINE' : 'PROMOTION_PLATFORM_TELEGRAM'
+      updateData.platform = platform === 'line' ? 'LINE' : platform === 'telegram' ? 'TELEGRAM' : 'WEB'
     }
 
     if (status !== undefined) {
-      if (!['active', 'inactive'].includes(status)) {
+      if (!['active', 'inactive', 'deleted'].includes(status)) {
         return NextResponse.json(
           {
             success: false,
-            message: '状态必须是 active 或 inactive',
+            message: '状态必须是 active、inactive 或 deleted',
           },
           { status: 400 }
         )
       }
-      updateData.status = status === 'inactive' ? 'PROMOTION_STATUS_INACTIVE' : 'PROMOTION_STATUS_ACTIVE'
+      updateData.status = status === 'inactive' ? 'INACTIVE' : status === 'deleted' ? 'DELETED' : 'ACTIVE'
     }
 
     // 更新推广配置
@@ -256,10 +314,15 @@ export async function PUT(request: NextRequest) {
     })
 
     // 格式化返回数据
+    const platformMap: Record<string, string> = {
+      LINE: 'line',
+      TELEGRAM: 'telegram',
+      WEB: 'web',
+    }
     const formattedPromotion = {
       ...updatedPromotion,
-      status: updatedPromotion.status === 'PROMOTION_STATUS_ACTIVE' ? 'active' : 'inactive',
-      platform: updatedPromotion.platform === 'PROMOTION_PLATFORM_LINE' ? 'line' : 'telegram',
+      status: updatedPromotion.status === 'ACTIVE' ? 'active' : updatedPromotion.status === 'INACTIVE' ? 'inactive' : 'deleted',
+      platform: platformMap[updatedPromotion.platform] || updatedPromotion.platform,
     }
 
     return NextResponse.json({
@@ -298,7 +361,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 检查推广配置是否存在
+    // 检查推广配置是否存在且未被删除
     const existingPromotion = await typedPrisma.promotion.findUnique({
       where: { id },
     })
@@ -313,9 +376,21 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // 删除推广配置
-    await typedPrisma.promotion.delete({
+    // 检查是否已经被删除
+    if (existingPromotion.status === 'DELETED') {
+      return NextResponse.json(
+        {
+          success: false,
+          message: '推广配置已被删除',
+        },
+        { status: 400 }
+      )
+    }
+
+    // 逻辑删除推广配置（更新状态为DELETED）
+    await typedPrisma.promotion.update({
       where: { id },
+      data: { status: 'DELETED' },
     })
 
     return NextResponse.json({

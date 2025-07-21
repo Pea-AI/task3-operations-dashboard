@@ -17,114 +17,116 @@ enum COMMON_STATUS {
 
 // 社区管理模型
 model Community {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  user_id      String   @db.ObjectId @map("user_id") // 创建用户ID
-  app_id       String?  @db.ObjectId @map("app_id") // 应用ID
-  app_handle   String?  @map("app_handle") // 应用标识
-  name         String   @map("name") // 社区名称
-  handle       String   @unique @map("handle") // 社区标识
-  logo         String?  @map("logo") // 社区Logo
-  category     String[] @map("category") // 分类标签
-  region       String   @map("region") // 地区
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id       String   @map("user_id") @db.ObjectId // 创建用户ID
+  app_id        String?  @map("app_id") @db.ObjectId // 应用ID
+  app_handle    String?  @map("app_handle") // 应用标识
+  name          String   @map("name") // 社区名称
+  handle        String   @unique @map("handle") // 社区标识
+  logo          String?  @map("logo") // 社区Logo
+  category      String[] @map("category") // 分类标签
+  region        String   @map("region") // 地区
   certification Boolean  @default(false) @map("certification") // 认证状态
-  twitter      String?  @map("twitter") // Twitter账号
-  github       String?  @map("github") // GitHub账号
-  discord      String?  @map("discord") // Discord链接
-  tgHandle     String?  @map("tgHandle") // Telegram账号
-  tgChannel    String?  @map("tgChannel") // Telegram频道
-  tgBot        String?  @map("tgBot") // Telegram机器人
-  tgGroup      String?  @map("tgGroup") // Telegram群组
-  description  String?  @map("description") // 描述
-  status       String   @default("active") @map("status") // 状态
-  created_at   DateTime @default(now()) @map("created_at") // 创建时间
-  updated_at   DateTime @updatedAt @map("updated_at") // 更新时间
+  twitter       String?  @map("twitter") // Twitter账号
+  github        String?  @map("github") // GitHub账号
+  discord       String?  @map("discord") // Discord链接
+  tgHandle      String?  @map("tgHandle") // Telegram账号
+  tgChannel     String?  @map("tgChannel") // Telegram频道
+  tgBot         String?  @map("tgBot") // Telegram机器人
+  tgGroup       String?  @map("tgGroup") // Telegram群组
+  description   String?  @map("description") // 描述
+  status        String   @default("active") @map("status") // 状态
+  created_at    DateTime @default(now()) @map("created_at") // 创建时间
+  updated_at    DateTime @updatedAt @map("updated_at") // 更新时间
 
   // 关联的创建者
-  creator      FtUser   @relation(fields: [user_id], references: [id])
+  creator FtUser @relation(fields: [user_id], references: [id])
 
   @@map("ft_community")
 }
 
 // 用户模型
 model FtUser {
-  id                     String    @id @default(auto()) @map("_id") @db.ObjectId
-  app_id                 String    @map("app_id") // 应用ID
-  app_handle             String?   @map("app_handle") // 应用标识
-  from_channel           String    @map("from_channel") // 来源渠道
-  register_method        String    @map("register_method") // 注册方式
-  first_name             String?   @map("first_name") // 名字
-  last_name              String?   @map("last_name") // 姓氏
-  avatar                 String?   @map("avatar") // 头像
-  nick_name              String?   @map("nick_name") // 昵称
-  email                  String?   @map("email") // 邮箱
-  description            String?   @map("description") // 描述
-  interested_tags        String[]  @map("interested_tags") // 感兴趣的标签
-  ip                     String?   @map("ip") // 首次记录的IP
-  country_code           String?   @map("country_code") // 首次记录的IP对应的国家
-  browser_languages      String[]  @map("browser_languages") // 浏览器支持的语言列表
-  language               String?   @map("language") // 用户手动选择的语言或默认语言
-  is_bot                 Boolean?  @map("is_bot") // 是否是机器人
-  handler                String    @map("handler") // 处理器
-  is_certified_account   Boolean   @default(false) @map("is_certified_account") // 是否认证账号
-  humanVerify            Boolean?  @default(false) @map("humanVerify") // 人工验证
-  last_login_time        DateTime? @map("last_login_time") // 最后登录时间
-  line_info              Json?     @map("line_info") // Line信息
-  created_at             DateTime  @default(now()) @map("created_at") // 创建时间
-  updated_at             DateTime  @updatedAt @map("updated_at") // 更新时间
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  app_id               String    @map("app_id") // 应用ID
+  app_handle           String?   @map("app_handle") // 应用标识
+  from_channel         String    @map("from_channel") // 来源渠道
+  register_method      String    @map("register_method") // 注册方式
+  first_name           String?   @map("first_name") // 名字
+  last_name            String?   @map("last_name") // 姓氏
+  avatar               String?   @map("avatar") // 头像
+  nick_name            String?   @map("nick_name") // 昵称
+  email                String?   @map("email") // 邮箱
+  description          String?   @map("description") // 描述
+  interested_tags      String[]  @map("interested_tags") // 感兴趣的标签
+  ip                   String?   @map("ip") // 首次记录的IP
+  country_code         String?   @map("country_code") // 首次记录的IP对应的国家
+  browser_languages    String[]  @map("browser_languages") // 浏览器支持的语言列表
+  language             String?   @map("language") // 用户手动选择的语言或默认语言
+  is_bot               Boolean?  @map("is_bot") // 是否是机器人
+  handler              String    @map("handler") // 处理器
+  is_certified_account Boolean   @default(false) @map("is_certified_account") // 是否认证账号
+  humanVerify          Boolean?  @default(false) @map("humanVerify") // 人工验证
+  last_login_time      DateTime? @map("last_login_time") // 最后登录时间
+  line_info            Json?     @map("line_info") // Line信息
+  created_at           DateTime  @default(now()) @map("created_at") // 创建时间
+  updated_at           DateTime  @updatedAt @map("updated_at") // 更新时间
 
   // 关联的token
-  tokens                 FtToken[]
+  tokens FtToken[]
 
   // 创建的社区
-  communities            Community[]
+  communities Community[]
 
   @@map("ft_user")
 }
 
 // Token 模型
 model FtToken {
-  id          String        @id @default(auto()) @map("_id") @db.ObjectId
-  token       String        @unique @map("token") // Token值
-  app_handle  String?       @map("app_handle") // 应用标识
-  app_id      String?       @map("app_id") // 应用ID
-  open_id     String?       @map("open_id") // 开放ID
-  user_id     String        @db.ObjectId @map("user_id") // 用户ID
-  status      COMMON_STATUS @default(COMMON_STATUS_ACTIVE) @map("status") // 状态
-  created_at  DateTime      @default(now()) @map("created_at") // 创建时间
-  updated_at  DateTime      @updatedAt @map("updated_at") // 更新时间
+  id         String        @id @default(auto()) @map("_id") @db.ObjectId
+  token      String        @unique @map("token") // Token值
+  app_handle String?       @map("app_handle") // 应用标识
+  app_id     String?       @map("app_id") // 应用ID
+  open_id    String?       @map("open_id") // 开放ID
+  user_id    String        @map("user_id") @db.ObjectId // 用户ID
+  status     COMMON_STATUS @default(COMMON_STATUS_ACTIVE) @map("status") // 状态
+  created_at DateTime      @default(now()) @map("created_at") // 创建时间
+  updated_at DateTime      @updatedAt @map("updated_at") // 更新时间
 
   // 关联的用户
-  user        FtUser        @relation(fields: [user_id], references: [id])
+  user FtUser @relation(fields: [user_id], references: [id])
 
   @@map("ft_token")
 }
 
 // 推广配置状态枚举
 enum PROMOTION_STATUS {
-  PROMOTION_STATUS_ACTIVE
-  PROMOTION_STATUS_INACTIVE
+  ACTIVE
+  INACTIVE
+  DELETED
 }
 
 // 推广平台枚举
 enum PROMOTION_PLATFORM {
-  PROMOTION_PLATFORM_LINE
-  PROMOTION_PLATFORM_TELEGRAM
+  LINE
+  TELEGRAM
+  WEB
 }
 
 // 推广配置模型
 model Promotion {
-  id          String             @id @default(auto()) @map("_id") @db.ObjectId
-  title       String             @map("title") // 推广标题
-  img         String             @map("img") // 推广图片URL
-  url         String             @map("url") // 推广链接
-  tag         String             @map("tag") // 推广标签
-  platform    PROMOTION_PLATFORM @map("platform") // 推广平台
-  page        String             @map("page") // 页面
-  priority    Int                @default(1) @map("priority") // 优先级
-  eventIndex  Int                @default(0) @map("eventIndex") // 事件索引
-  status      PROMOTION_STATUS   @default(PROMOTION_STATUS_ACTIVE) @map("status") // 状态
-  created_at  DateTime           @default(now()) @map("created_at") // 创建时间
-  updated_at  DateTime           @updatedAt @map("updated_at") // 更新时间
+  id         String             @id @default(auto()) @map("_id") @db.ObjectId
+  title      String             @map("title") // 推广标题
+  img        String             @map("img") // 推广图片URL
+  url        String             @map("url") // 推广链接
+  tag        String             @map("tag") // 推广标签
+  platform   PROMOTION_PLATFORM @map("platform") // 推广平台
+  page       String             @map("page") // 页面
+  priority   Int                @default(1) @map("priority") // 优先级
+  eventIndex Int                @default(0) @map("eventIndex") // 事件索引
+  status     PROMOTION_STATUS   @default(ACTIVE) @map("status") // 状态
+  created_at DateTime           @default(now()) @map("created_at") // 创建时间
+  updated_at DateTime           @updatedAt @map("updated_at") // 更新时间
 
   @@map("ft_promotion")
 }
