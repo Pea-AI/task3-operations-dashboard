@@ -119,6 +119,47 @@ export const updateCommunityStatus = async (params: UpdateCommunityStatusParams)
   return response.data
 }
 
+// 获取奖励历史记录 API
+export const getRewardHistory = async (
+  params: {
+    userIdentifier?: string
+    assetType?: string
+    status?: string
+    page?: number
+    pageSize?: number
+  } = {}
+): Promise<{
+  records: any[]
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+    totalPages: number
+  }
+}> => {
+  const searchParams = new URLSearchParams()
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, value.toString())
+    }
+  })
+
+  const response = await fetch(`/api/reward-history?${searchParams.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('获取奖励历史记录失败')
+  }
+
+  const result = await response.json()
+  return result.data
+}
+
 // ========== 通用 Hook ==========
 // 用于包装任何 API 函数的通用 hook
 

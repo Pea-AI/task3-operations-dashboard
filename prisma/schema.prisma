@@ -131,3 +131,19 @@ model Promotion {
 
   @@map("ft_promotion")
 }
+
+model RewardDistributionHistory {
+  id              String   @id @default(uuid()) @map("_id")
+  timestamp       DateTime @default(now())
+  userId          String?
+  tgHandle        String?
+  assetId         String
+  assetType       String
+  amount          Float
+  status          String
+  operator        String
+  flowName        String
+  flowDescription String
+  note            String?
+  errorMessage    String?
+}

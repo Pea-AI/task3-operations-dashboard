@@ -1,16 +1,17 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Search, Download } from "lucide-react"
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { CalendarIcon, Search, Download, Loader2 } from 'lucide-react'
+import { getRewardHistory } from '@/hooks/use-api'
 
 interface HistoryRecord {
   id: string
@@ -19,106 +20,70 @@ interface HistoryRecord {
   tgHandle?: string
   assetType: string
   amount: number
-  status: "success" | "failed"
+  status: 'success' | 'failed'
   operator: string
   note?: string
 }
 
-const mockHistory: HistoryRecord[] = [
-  {
-    id: "1",
-    timestamp: "2024-01-15 14:30:25",
-    userId: "12345",
-    tgHandle: "@user1",
-    assetType: "USDT",
-    amount: 10,
-    status: "success",
-    operator: "ops@company.com",
-    note: "社区活动奖励",
-  },
-  {
-    id: "2",
-    timestamp: "2024-01-15 14:25:10",
-    userId: "12346",
-    tgHandle: "@user2",
-    assetType: "Points",
-    amount: 100,
-    status: "success",
-    operator: "ops@company.com",
-  },
-  {
-    id: "3",
-    timestamp: "2024-01-15 14:20:45",
-    userId: "12347",
-    tgHandle: "@user3",
-    assetType: "TON",
-    amount: 5,
-    status: "failed",
-    operator: "ops@company.com",
-    note: "用户钱包地址无效",
-  },
-  {
-    id: "4",
-    timestamp: "2024-01-14 16:15:30",
-    userId: "12348",
-    tgHandle: "@user4",
-    assetType: "QLuck",
-    amount: 50,
-    status: "success",
-    operator: "ops@company.com",
-  },
-  {
-    id: "5",
-    timestamp: "2024-01-14 15:45:20",
-    userId: "12349",
-    tgHandle: "@user5",
-    assetType: "PEPE",
-    amount: 1000,
-    status: "success",
-    operator: "ops@company.com",
-    note: "推荐奖励",
-  },
-]
-
 export function DistributionHistory() {
-  const [history] = useState<HistoryRecord[]>(mockHistory)
+  const [history, setHistory] = useState<HistoryRecord[]>([])
+  const [loading, setLoading] = useState(false)
   const [filters, setFilters] = useState({
-    userIdentifier: "",
-    assetType: "all",
-    status: "all",
+    userIdentifier: '',
+    assetType: 'all',
+    status: 'all',
     dateFrom: undefined as Date | undefined,
     dateTo: undefined as Date | undefined,
   })
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
   const itemsPerPage = 10
 
-  const filteredHistory = history.filter((record) => {
-    const matchesUser =
-      !filters.userIdentifier ||
-      record.userId?.includes(filters.userIdentifier) ||
-      record.tgHandle?.includes(filters.userIdentifier)
+  // 获取历史记录数据
+  const fetchHistory = async () => {
+    try {
+      setLoading(true)
+      const result = await getRewardHistory({
+        userIdentifier: filters.userIdentifier || undefined,
+        assetType: filters.assetType === 'all' ? undefined : filters.assetType,
+        status: filters.status === 'all' ? undefined : filters.status,
+        page: currentPage,
+        pageSize: itemsPerPage,
+      })
 
-    const matchesAsset = filters.assetType === "all" || record.assetType === filters.assetType
-    const matchesStatus = filters.status === "all" || record.status === filters.status
+      setHistory(result.records)
+      setTotalPages(result.pagination.totalPages)
+      setTotal(result.pagination.total)
+    } catch (error) {
+      console.error('获取奖励历史记录失败:', error)
+      setHistory([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    // Simple date filtering (in real app, you'd parse the timestamp properly)
-    const matchesDate = true // Simplified for demo
+  // 初始加载和筛选条件变化时重新获取数据
+  useEffect(() => {
+    fetchHistory()
+  }, [currentPage])
 
-    return matchesUser && matchesAsset && matchesStatus && matchesDate
-  })
+  // 筛选条件变化时重置到第一页并重新获取数据
+  useEffect(() => {
+    if (currentPage === 1) {
+      fetchHistory()
+    } else {
+      setCurrentPage(1)
+    }
+  }, [filters.userIdentifier, filters.assetType, filters.status])
 
-  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage)
-  const paginatedHistory = filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-
-  const getStatusBadge = (status: "success" | "failed") => {
-    return (
-      <Badge variant={status === "success" ? "default" : "destructive"}>{status === "success" ? "成功" : "失败"}</Badge>
-    )
+  const getStatusBadge = (status: 'success' | 'failed') => {
+    return <Badge variant={status === 'success' ? 'default' : 'destructive'}>{status === 'success' ? '成功' : '失败'}</Badge>
   }
 
   const handleExport = () => {
     // In a real app, this would generate and download a CSV/Excel file
-    alert("导出功能将生成包含当前筛选结果的 Excel 文件")
+    alert('导出功能将生成包含当前筛选结果的 Excel 文件')
   }
 
   return (
@@ -146,10 +111,7 @@ export function DistributionHistory() {
 
             <div className="space-y-2">
               <Label>奖励类型</Label>
-              <Select
-                value={filters.assetType}
-                onValueChange={(value) => setFilters((prev) => ({ ...prev, assetType: value }))}
-              >
+              <Select value={filters.assetType} onValueChange={(value) => setFilters((prev) => ({ ...prev, assetType: value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="选择类型" />
                 </SelectTrigger>
@@ -167,10 +129,7 @@ export function DistributionHistory() {
 
             <div className="space-y-2">
               <Label>状态</Label>
-              <Select
-                value={filters.status}
-                onValueChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}
-              >
+              <Select value={filters.status} onValueChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="选择状态" />
                 </SelectTrigger>
@@ -204,7 +163,7 @@ export function DistributionHistory() {
           </div>
 
           <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-muted-foreground">共找到 {filteredHistory.length} 条记录</p>
+            <p className="text-sm text-muted-foreground">共找到 {total} 条记录</p>
             <Button onClick={handleExport} variant="outline">
               <Download className="h-4 w-4 mr-2" />
               导出数据
@@ -226,17 +185,32 @@ export function DistributionHistory() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedHistory.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell className="font-mono text-sm">{record.timestamp}</TableCell>
-                    <TableCell>{record.userId || record.tgHandle}</TableCell>
-                    <TableCell>{record.assetType}</TableCell>
-                    <TableCell>{record.amount}</TableCell>
-                    <TableCell>{getStatusBadge(record.status)}</TableCell>
-                    <TableCell className="text-sm">{record.operator}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{record.note || "-"}</TableCell>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                      <p className="text-sm text-muted-foreground mt-2">加载中...</p>
+                    </TableCell>
                   </TableRow>
-                ))}
+                ) : history.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <p className="text-sm text-muted-foreground">暂无数据</p>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  history.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-mono text-sm">{new Date(record.timestamp).toLocaleString('zh-CN')}</TableCell>
+                      <TableCell>{record.userId || record.tgHandle}</TableCell>
+                      <TableCell>{record.assetType}</TableCell>
+                      <TableCell>{record.amount}</TableCell>
+                      <TableCell>{getStatusBadge(record.status)}</TableCell>
+                      <TableCell className="text-sm">{record.operator}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{record.note || '-'}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -252,7 +226,7 @@ export function DistributionHistory() {
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
+                  disabled={currentPage === 1 || loading}
                 >
                   上一页
                 </Button>
@@ -260,7 +234,7 @@ export function DistributionHistory() {
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || loading}
                 >
                   下一页
                 </Button>
