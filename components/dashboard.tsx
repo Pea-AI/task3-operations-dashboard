@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { User } from '@/lib/data-model'
@@ -12,9 +12,11 @@ import { RewardDistribution } from '@/components/reward-distribution'
 import { DistributionHistory } from '@/components/distribution-history'
 import { PromotionManagement } from '@/components/promotion-management'
 import { useUser } from '@/hooks/use-user'
+import { useToast } from '@/hooks/use-toast'
 
 export function Dashboard() {
   const { user, isAuthenticated, isLoading, login, logout } = useUser()
+  const { toast } = useToast()
   // 如果没有用户数据或登出函数，显示错误
   // if (!user || !onLogout) {
   //   return (
@@ -25,6 +27,7 @@ export function Dashboard() {
   //     </div>
   //   )
   // }
+
   const [activeTab, setActiveTab] = useState('community')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 

@@ -16,6 +16,8 @@ import { Upload, Send, FileSpreadsheet, X } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useSendRewardMutation, useSendPointRewardMutation, sendPointReward, sendAssetReward, type RewardResponse } from '@/hooks/use-api'
 import * as XLSX from 'xlsx'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'
+import { useUser } from '@/hooks/use-user'
 
 interface RewardRecord {
   id: string
@@ -40,6 +42,7 @@ const assetTypes = [
 ]
 
 export function RewardDistribution() {
+  const { user } = useUser()
   const [singleReward, setSingleReward] = useState({
     userType: 'tgHandle',
     userInputs: [] as string[],
@@ -53,12 +56,27 @@ export function RewardDistribution() {
   const [selectedRewards, setSelectedRewards] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const [resultDialogOpen, setResultDialogOpen] = useState(false)
+  const [resultDialogData, setResultDialogData] = useState<{
+    successHandles: string[]
+    notFoundUserHandles: string[]
+    foundUserHandles?: string[]
+    type: 'point' | 'asset'
+  } | null>(null)
 
   // 使用发送奖励的 API
   const sendRewardMutation = useSendRewardMutation({
     onSuccess: (data: RewardResponse) => {
       const successCount = data.successHandles?.length || 0
       const failedCount = (data.notFoundUserHandles?.length || 0) + ((data.foundUserHandles?.length || 0) - successCount)
+
+      setResultDialogData({
+        successHandles: data.successHandles ?? [],
+        notFoundUserHandles: data.notFoundUserHandles ?? [],
+        foundUserHandles: data.foundUserHandles ?? [],
+        type: 'asset',
+      })
+      setResultDialogOpen(true)
 
       toast({
         title: '发送完成',
@@ -88,9 +106,18 @@ export function RewardDistribution() {
 
   // 使用发送积分奖励的 API
   const sendPointRewardMutation = useSendPointRewardMutation({
-    onSuccess: (data: RewardResponse) => {
+    onSuccess: (res: RewardResponse) => {
+      const data = res.data
       const successCount = data.successHandles?.length || 0
       const failedCount = (data.notFoundUserHandles?.length || 0) + ((data.foundUserHandles?.length || 0) - successCount)
+      console.log('sendPointRewardMutation data', data)
+      setResultDialogData({
+        successHandles: data.successHandles ?? [],
+        notFoundUserHandles: data.notFoundUserHandles ?? [],
+        foundUserHandles: data.foundUserHandles ?? [],
+        type: 'point',
+      })
+      setResultDialogOpen(true)
 
       toast({
         title: '发送完成',
@@ -286,7 +313,7 @@ export function RewardDistribution() {
             amount: group[0].amount, // 假设同组内金额相同
             flowName: group[0].flowName!,
             flowDescription: group[0].flowDescription!,
-            sender: 'admin',
+            sender: user?.nickName || 'admin',
           }
 
           const response: RewardResponse = await sendAssetReward(baseParams)
@@ -787,6 +814,65 @@ export function RewardDistribution() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 发送结果 Dialog */}
+      <Dialog open={resultDialogOpen} onOpenChange={setResultDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>奖励发送结果</DialogTitle>
+            <DialogDescription>本次奖励发送的详细结果如下：</DialogDescription>
+          </DialogHeader>
+          {resultDialogData && (
+            <div className="space-y-4">
+              <div>
+                <span className="font-semibold">成功用户 ({resultDialogData.successHandles.length})：</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {resultDialogData.successHandles.length > 0 ? (
+                    resultDialogData.successHandles.map((h, i) => (
+                      <Badge key={i} variant="default">
+                        {h}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground text-xs">无</span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <span className="font-semibold">未找到用户 ({resultDialogData.notFoundUserHandles.length})：</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {resultDialogData.notFoundUserHandles.length > 0 ? (
+                    resultDialogData.notFoundUserHandles.map((h, i) => (
+                      <Badge key={i} variant="destructive">
+                        {h}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground text-xs">无</span>
+                  )}
+                </div>
+              </div>
+              {resultDialogData.foundUserHandles && resultDialogData.foundUserHandles.length > 0 && (
+                <div>
+                  <span className="font-semibold">已找到用户 ({resultDialogData.foundUserHandles.length})：</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {resultDialogData.foundUserHandles.map((h, i) => (
+                      <Badge key={i} variant="secondary">
+                        {h}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">关闭</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
