@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { User } from '@/lib/data-model'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Building2, Gift, History, LogOut, Menu, Settings } from 'lucide-react'
@@ -10,13 +11,20 @@ import { CommunityManagement } from '@/components/community-management'
 import { RewardDistribution } from '@/components/reward-distribution'
 import { DistributionHistory } from '@/components/distribution-history'
 import { PromotionManagement } from '@/components/promotion-management'
+import { useUser } from '@/hooks/use-user'
 
-interface DashboardProps {
-  user: any
-  onLogout: () => void
-}
-
-export function Dashboard({ user, onLogout }: DashboardProps) {
+export function Dashboard() {
+  const { user, isAuthenticated, isLoading, login, logout } = useUser()
+  // 如果没有用户数据或登出函数，显示错误
+  // if (!user || !onLogout) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center bg-gray-50">
+  //       <div className="text-center">
+  //         <p className="text-gray-600">认证信息缺失</p>
+  //       </div>
+  //     </div>
+  //   )
+  // }
   const [activeTab, setActiveTab] = useState('community')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -108,17 +116,17 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar || '/placeholder.svg'} alt={user.name} />
-                  <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                  <AvatarImage src={user?.avatar || '/placeholder.svg'} alt={user?.nickName} />
+                  <AvatarFallback>{user?.nickName.charAt(0)}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuItem className="flex-col items-start">
-                <div className="font-medium">{user.name}</div>
-                <div className="text-sm text-muted-foreground">{user.email}</div>
+                <div className="font-medium">{user?.nickName}</div>
+                <div className="text-sm text-muted-foreground">{user?.email}</div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onLogout}>
+              <DropdownMenuItem onClick={logout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 退出登录
               </DropdownMenuItem>

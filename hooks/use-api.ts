@@ -42,10 +42,10 @@ export const sendPointReward = async (params: Omit<SendRewardParams, 'assetId'>)
 }
 
 // 获取用户信息 API
-export const getUserInfo = async (userId: string) => {
+export const getUserInfo = async () => {
   const response = await apiClient.request({
     method: 'GET',
-    url: `/v1/user/${userId}`,
+    url: `/v1/user/info`,
   })
   return response.data
 }
