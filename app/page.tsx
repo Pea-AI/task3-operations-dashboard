@@ -1,37 +1,30 @@
-"use client"
+'use client'
 
-import { useState, useEffect } from "react"
-import { LoginPage } from "@/components/login-page"
-import { Dashboard } from "@/components/dashboard"
+import { Suspense } from 'react'
+import { AuthLayout } from '@/components/auth-layout'
+import { Dashboard } from '@/components/dashboard'
+
+function HomeContent() {
+  return (
+    <AuthLayout>
+      <Dashboard />
+    </AuthLayout>
+  )
+}
 
 export default function Home() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [user, setUser] = useState<any>(null)
-
-  useEffect(() => {
-    // Check if user is already logged in
-    const savedUser = localStorage.getItem("user")
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
-      setIsAuthenticated(true)
-    }
-  }, [])
-
-  const handleLogin = (userData: any) => {
-    setUser(userData)
-    setIsAuthenticated(true)
-    localStorage.setItem("user", JSON.stringify(userData))
-  }
-
-  const handleLogout = () => {
-    setUser(null)
-    setIsAuthenticated(false)
-    localStorage.removeItem("user")
-  }
-
-  if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />
-  }
-
-  return <Dashboard user={user} onLogout={handleLogout} />
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="text-gray-600">正在加载...</p>
+          </div>
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
+  )
 }

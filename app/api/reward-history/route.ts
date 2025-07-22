@@ -53,3 +53,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, message: '获取奖励历史记录失败' }, { status: 500 })
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const data = await req.json()
+    const record = await prisma.rewardDistributionHistory.create({
+      data: {
+        userId: data.userId,
+        tgHandle: data.tgHandle,
+        assetId: data.assetId,
+        assetType: data.assetType,
+        amount: data.amount,
+        status: data.status,
+        operator: data.operator,
+        flowName: data.flowName,
+        flowDescription: data.flowDescription,
+        note: data.note,
+        errorMessage: data.errorMessage,
+        foundUserHandles: data.foundUserHandles ?? [],
+        notFoundUserHandles: data.notFoundUserHandles ?? [],
+        successHandles: data.successHandles ?? [],
+      },
+    })
+    return NextResponse.json({ success: true, data: record })
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}

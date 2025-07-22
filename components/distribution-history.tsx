@@ -12,6 +12,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CalendarIcon, Search, Download, Loader2 } from 'lucide-react'
 import { getRewardHistory } from '@/hooks/use-api'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerClose } from '@/components/ui/drawer'
 
 interface HistoryRecord {
   id: string
@@ -23,6 +24,12 @@ interface HistoryRecord {
   status: 'success' | 'failed'
   operator: string
   note?: string
+  flowName?: string
+  flowDescription?: string
+  errorMessage?: string
+  foundUserHandles?: string[]
+  notFoundUserHandles?: string[]
+  successHandles?: string[]
 }
 
 export function DistributionHistory() {
@@ -39,6 +46,8 @@ export function DistributionHistory() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const itemsPerPage = 10
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<HistoryRecord | null>(null)
 
   // 获取历史记录数据
   const fetchHistory = async () => {
@@ -182,19 +191,20 @@ export function DistributionHistory() {
                   <TableHead>状态</TableHead>
                   <TableHead>操作员</TableHead>
                   <TableHead>备注</TableHead>
+                  <TableHead>详情</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                       <p className="text-sm text-muted-foreground mt-2">加载中...</p>
                     </TableCell>
                   </TableRow>
                 ) : history.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       <p className="text-sm text-muted-foreground">暂无数据</p>
                     </TableCell>
                   </TableRow>
@@ -208,6 +218,18 @@ export function DistributionHistory() {
                       <TableCell>{getStatusBadge(record.status)}</TableCell>
                       <TableCell className="text-sm">{record.operator}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{record.note || '-'}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedRecord(record)
+                            setDrawerOpen(true)
+                          }}
+                        >
+                          查看
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -243,6 +265,85 @@ export function DistributionHistory() {
           )}
         </CardContent>
       </Card>
+
+      {/* 详情 Drawer */}
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>发放详情</DrawerTitle>
+            <DrawerDescription>奖励发放的所有详细数据</DrawerDescription>
+          </DrawerHeader>
+          {selectedRecord ? (
+            <div className="p-6 space-y-4">
+              <div>
+                <div className="font-semibold mb-1">基本信息</div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>时间：{new Date(selectedRecord.timestamp).toLocaleString('zh-CN')}</div>
+                  <div>用户ID：{selectedRecord.userId || '-'}</div>
+                  <div>Handle：{selectedRecord.tgHandle || '-'}</div>
+                  <div>类型：{selectedRecord.assetType}</div>
+                  <div>数量：{selectedRecord.amount}</div>
+                  <div>状态：{getStatusBadge(selectedRecord.status)}</div>
+                  <div>操作员：{selectedRecord.operator}</div>
+                  <div>备注：{selectedRecord.note || '-'}</div>
+                  <div>flowName：{selectedRecord.flowName || '-'}</div>
+                  <div>flowDescription：{selectedRecord.flowDescription || '-'}</div>
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold mb-1 mt-2">结果详情</div>
+                <div className="mb-1">成功用户：</div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {(Array.isArray(selectedRecord.successHandles) ? selectedRecord.successHandles : []).length > 0 ? (
+                    (selectedRecord.successHandles as string[]).map((h, i) => (
+                      <Badge key={i} variant="default">
+                        {h}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground text-xs">无</span>
+                  )}
+                </div>
+                <div className="mb-1">已找到用户：</div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {(Array.isArray(selectedRecord.foundUserHandles) ? selectedRecord.foundUserHandles : []).length > 0 ? (
+                    (selectedRecord.foundUserHandles as string[]).map((h, i) => (
+                      <Badge key={i} variant="secondary">
+                        {h}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground text-xs">无</span>
+                  )}
+                </div>
+                <div className="mb-1">未找到用户：</div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {(Array.isArray(selectedRecord.notFoundUserHandles) ? selectedRecord.notFoundUserHandles : []).length > 0 ? (
+                    (selectedRecord.notFoundUserHandles as string[]).map((h, i) => (
+                      <Badge key={i} variant="destructive">
+                        {h}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground text-xs">无</span>
+                  )}
+                </div>
+              </div>
+              {selectedRecord.errorMessage && (
+                <div>
+                  <div className="font-semibold mb-1 mt-2">错误信息</div>
+                  <div className="text-destructive text-xs break-all">{selectedRecord.errorMessage}</div>
+                </div>
+              )}
+              <div className="flex justify-end pt-2">
+                <DrawerClose asChild>
+                  <Button variant="outline">关闭</Button>
+                </DrawerClose>
+              </div>
+            </div>
+          ) : null}
+        </DrawerContent>
+      </Drawer>
     </div>
   )
 }

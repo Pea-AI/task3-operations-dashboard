@@ -9,8 +9,8 @@ export interface SendRewardParams {
   assetId: string
   amount: number
   flowName: string
-  flowDescription: string
-  sender: string
+  flowDescription?: string
+  sender?: string
 }
 
 export interface RewardResponse {
@@ -42,10 +42,10 @@ export const sendPointReward = async (params: Omit<SendRewardParams, 'assetId'>)
 }
 
 // 获取用户信息 API
-export const getUserInfo = async (userId: string) => {
+export const getUserInfo = async () => {
   const response = await apiClient.request({
     method: 'GET',
-    url: `/v1/user/${userId}`,
+    url: `/v1/user/info`,
   })
   return response.data
 }
@@ -160,6 +160,33 @@ export const getRewardHistory = async (
   return result.data
 }
 
+export interface RewardHistoryRecord {
+  userId?: string
+  tgHandle?: string
+  assetId: string
+  assetType: string
+  amount: number
+  status: string
+  operator: string
+  flowName: string
+  flowDescription: string
+  note?: string
+  errorMessage?: string
+  foundUserHandles?: string[]
+  notFoundUserHandles?: string[]
+  successHandles?: string[]
+}
+
+export const addRewardHistory = async (record: RewardHistoryRecord) => {
+  const response = await fetch('/api/reward-history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!response.ok) throw new Error('写入奖励历史失败')
+  return response.json()
+}
+
 // ========== 通用 Hook ==========
 // 用于包装任何 API 函数的通用 hook
 
@@ -224,7 +251,27 @@ export const useSendRewardMutation = (options?: { onSuccess?: (data: any) => voi
 
   return useMutation({
     mutationFn: (params: SendRewardParams) => sendAssetReward(params),
-    onSuccess: options?.onSuccess,
+    onSuccess: async (data, variables) => {
+      try {
+        await addRewardHistory({
+          userId: variables.sender,
+          tgHandle: variables.telegramHandles.join(','),
+          assetId: variables.assetId,
+          assetType: 'token',
+          amount: variables.amount,
+          status: 'success',
+          operator: variables.sender || 'admin',
+          flowName: variables.flowName,
+          flowDescription: variables.flowDescription || '',
+          foundUserHandles: data.foundUserHandles,
+          notFoundUserHandles: data.notFoundUserHandles,
+          successHandles: data.successHandles,
+        })
+      } catch (e) {
+        console.error('写入奖励历史失败', e)
+      }
+      options?.onSuccess?.(data)
+    },
     onError: options?.onError,
   })
 }
@@ -235,7 +282,27 @@ export const useSendPointRewardMutation = (options?: { onSuccess?: (data: any) =
 
   return useMutation({
     mutationFn: (params: Omit<SendRewardParams, 'assetId'>) => sendPointReward(params),
-    onSuccess: options?.onSuccess,
+    onSuccess: async (data, variables) => {
+      try {
+        await addRewardHistory({
+          userId: variables.sender,
+          tgHandle: variables.telegramHandles.join(','),
+          assetId: '',
+          assetType: 'point',
+          amount: variables.amount,
+          status: 'success',
+          operator: variables.sender || 'admin',
+          flowName: variables.flowName,
+          flowDescription: variables.flowDescription || '',
+          foundUserHandles: data.foundUserHandles ?? [],
+          notFoundUserHandles: data.notFoundUserHandles ?? [],
+          successHandles: data.successHandles ?? [],
+        })
+      } catch (e) {
+        console.error('写入奖励历史失败', e)
+      }
+      options?.onSuccess?.(data)
+    },
     onError: options?.onError,
   })
 }

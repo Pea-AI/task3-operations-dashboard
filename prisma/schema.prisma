@@ -135,8 +135,8 @@ model Promotion {
 model RewardDistributionHistory {
   id              String   @id @default(uuid()) @map("_id")
   timestamp       DateTime @default(now())
-  userId          String?
-  tgHandle        String?
+  userId          Json?
+  tgHandle        Json?
   assetId         String
   assetType       String
   amount          Float
@@ -146,4 +146,9 @@ model RewardDistributionHistory {
   flowDescription String
   note            String?
   errorMessage    String?
+  foundUserHandles     Json?
+  notFoundUserHandles  Json?
+  successHandles       Json?
+
+  @@map("ft_reward_distribution_history")
 }
